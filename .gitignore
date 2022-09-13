@@ -1,0 +1,8 @@
+bin
+*.xml
+*.meta
+*.pb
+*.mp4
+*.avi
+build
+target
