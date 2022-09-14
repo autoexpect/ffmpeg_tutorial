@@ -14,7 +14,7 @@ clean:
 	rm -rf ${BUILD_DIR}/*
 
 release:
-	-sudo rm -rf ${BUILD_DIR}/ffmpeg_tutorial && mkdir ${BUILD_DIR}/ffmpeg_tutorial
+	-rm -rf ${BUILD_DIR}/ffmpeg_tutorial && mkdir ${BUILD_DIR}/ffmpeg_tutorial
 	cd ${BUILD_DIR}/ffmpeg_tutorial && cmake \
 	-DCMAKE_TOOLCHAIN_FILE=${ROOT_DIR}/toolChain.cmake \
 	-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} \
@@ -23,9 +23,7 @@ release:
 	make -j$(nproc) && make install && cd -
 	cp ${ROOT_DIR}/src/rockchip/librknn_api.so ${INSTALL_DIR}/lib
 	cp ${ROOT_DIR}/src/rockchip/librknnrt.so ${INSTALL_DIR}/lib
-	patchelf --set-rpath './target/lib' build/ffmpeg_tutorial/ffmpeg_tutorial
-	chmod +u ./build/ffmpeg_tutorial/ffmpeg_tutorial
-	sudo chown root:root ./build/ffmpeg_tutorial/ffmpeg_tutorial
+	patchelf --set-rpath './target/lib' target/bin/ffmpeg_tutorial
 
 opencv:
 	@[ ! -d ${BUILD_DIR}/opencv ] && git clone https://github.com/opencv/opencv.git --depth=1 ${BUILD_DIR}/opencv || echo "opencv source ready..."
@@ -41,6 +39,20 @@ opencv:
 		-DINSTALL_DIR=${INSTALL_DIR} ${BUILD_DIR}/opencv && \
 	make -j4 && make install && cd -
 	touch ${BUILD_DIR}/opencv/.build_ok
+
+sdl2:
+	@[ ! -d ${BUILD_DIR}/SDL ] && git clone https://github.com/libsdl-org/SDL.git --depth=1 ${BUILD_DIR}/SDL || echo "SDL source ready..."
+	@[ -e ${BUILD_DIR}/SDL/.build_ok ] && echo "SDL compilation completed..." || mkdir -p ${BUILD_DIR}/SDL/build
+
+	cd ${BUILD_DIR}/SDL/build && LD_LIBRARY_PATH=${INSTALL_DIR}/lib \
+	cmake \
+		-DSDL_TEST=OFF -DSDL_OPENGLES=ON -DSDL_OPENGL=ON \
+		-DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
+		-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} \
+		-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} \
+		-DINSTALL_DIR=${INSTALL_DIR} ${BUILD_DIR}/SDL && \
+	make -j4 && make install && cd -
+	touch ${BUILD_DIR}/SDL/.build_ok
 
 ffmpeg:
 	@[ ! -d ${BUILD_DIR}/ffmpeg-rockchip-4.1.3 ] && git clone https://github.com/autoexpect/ffmpeg-rockchip-4.1.3.git --depth=1 ${BUILD_DIR}/ffmpeg-rockchip-4.1.3 || echo "ffmpeg-rockchip-4.1.3 source ready..."

@@ -6,9 +6,8 @@
 #define BUFFER_COUNT 4
 #define FMT_NUM_PLANES 1
 
-#define WIDTH_P 960
-#define HEIGHT_P 540
-#define FPS 25
+#define WIDTH_P 1280
+#define HEIGHT_P 720
 
 struct drm_buf {
 	int drm_buf_fd = -1;

@@ -25,7 +25,9 @@ int FFmpegStreamChannel::init_rga_drm()
 
 int FFmpegStreamChannel::init_window()
 {
-	cv::namedWindow("RK3588", cv::WINDOW_OPENGL);
+	window_name = "RK3588";
+	// cv::namedWindow(window_name, cv::WINDOW_OPENGL);
+	// cv::setOpenGlContext(window_name);
 	return 0;
 }
 
@@ -43,7 +45,7 @@ void FFmpegStreamChannel::bind_cv_mat_to_gl_texture(cv::Mat &image, GLuint &imag
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
 
-	cv::cvtColor(image, image, CV_RGB2BGR);
+	// cv::cvtColor(image, image, CV_RGB2BGR);
 
 	glTexImage2D(GL_TEXTURE_2D, // Type of texture
 		     0, // Pyramid level (for mip-mapping) - 0 is the top level
@@ -155,7 +157,6 @@ bool FFmpegStreamChannel::decode(const char *input_stream_url)
 
 	av_dump_format(format_context_input, 0, input_stream_url, 0);
 
-	/* 视频解码器初始化 */
 	{
 		video_stream_index_input = av_find_best_stream(format_context_input, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
 		AVStream *stream_input = format_context_input->streams[video_stream_index_input];
@@ -193,7 +194,6 @@ bool FFmpegStreamChannel::decode(const char *input_stream_url)
 		}
 	}
 
-	/* 音频解码器初始化 */
 	{
 		audio_stream_index_input = av_find_best_stream(format_context_input, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
 		AVStream *stream_input = format_context_input->streams[video_stream_index_input];
@@ -215,7 +215,7 @@ bool FFmpegStreamChannel::decode(const char *input_stream_url)
 
 		AVStream *stream_input = format_context_input->streams[packet_input_tmp->stream_index];
 
-		/* 视频帧处理 */
+		/* video */
 		if (packet_input_tmp->stream_index == video_stream_index_input) {
 			video_frame_size += packet_input_tmp->size;
 			video_frame_count++;
@@ -227,9 +227,6 @@ bool FFmpegStreamChannel::decode(const char *input_stream_url)
 			}
 
 			while (ret >= 0) {
-				ts_mark = current_timestamp();
-
-				/* RECV YUV  */
 				ret = avcodec_receive_frame(codec_ctx_input_video, frame_input_tmp);
 				if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
 					break;
@@ -239,20 +236,23 @@ bool FFmpegStreamChannel::decode(const char *input_stream_url)
 				}
 
 				auto av_drm_frame = reinterpret_cast<const AVDRMFrameDescriptor *>(frame_input_tmp->data[0]);
-				int fd = av_drm_frame->objects[0].fd;
+				auto layer = &reinterpret_cast<AVDRMFrameDescriptor *>(frame_input_tmp->data[0])->layers[0];
 				void *ptr = av_drm_frame->objects[0].ptr;
+				int fd = av_drm_frame->objects[0].fd;
+				int w = layer->planes[0].pitch;
+				int h = layer->planes[1].offset / w;
+
+				ts_mark = current_timestamp();
 
 				/* YUV 4 RKNN2 Compute */
 				rknn_img_resize_phy_to_phy(&rga_ctx, //
-							   fd, codec_ctx_input_video->width, codec_ctx_input_video->height, RK_FORMAT_YCbCr_420_SP, //
+							   fd, w, h, RK_FORMAT_YCbCr_420_SP, //
 							   drm_buf_for_rga1.drm_buf_fd, rknn_input_width, rknn_input_height, RK_FORMAT_RGB_888);
 
 				/* YUV 4 Show */
 				rknn_img_resize_phy_to_phy(&rga_ctx, //
-							   fd, codec_ctx_input_video->width, codec_ctx_input_video->height, RK_FORMAT_YCbCr_420_SP, //
+							   fd, w, h, RK_FORMAT_YCbCr_420_SP, //
 							   drm_buf_for_rga2.drm_buf_fd, WIDTH_P, HEIGHT_P, RK_FORMAT_BGR_888);
-
-				printf("USE_RGA---->[%fms]\n", ((double)(current_timestamp() - ts_mark)) / 1000);
 
 				/* rknn2 compute */
 				inputs[0].buf = drm_buf_for_rga1.drm_buf_ptr;
@@ -266,6 +266,7 @@ bool FFmpegStreamChannel::decode(const char *input_stream_url)
 
 				ret = rknn_run(rknn_ctx, NULL);
 				ret = rknn_outputs_get(rknn_ctx, io_num.n_output, outputs, NULL);
+				printf("DETECT OK---->[%fms]\n", ((double)(current_timestamp() - ts_mark)) / 1000);
 
 				/* post process */
 				float scale_w = (float)rknn_input_width / WIDTH_P;
@@ -278,8 +279,9 @@ bool FFmpegStreamChannel::decode(const char *input_stream_url)
 					out_scales.push_back(output_attrs[i].scale);
 					out_zps.push_back(output_attrs[i].zp);
 				}
-				post_process((int8_t *)outputs[0].buf, (int8_t *)outputs[1].buf, (int8_t *)outputs[2].buf, rknn_input_height, rknn_input_width, box_conf_threshold, nms_threshold,
-					     scale_w, scale_h, out_zps, out_scales, &detect_result_group);
+				post_process((int8_t *)outputs[0].buf, (int8_t *)outputs[1].buf, (int8_t *)outputs[2].buf, rknn_input_height, rknn_input_width,
+					     box_conf_threshold, nms_threshold, scale_w, scale_h, out_zps, out_scales, &detect_result_group);
+				printf("POST PROCESS OK---->[%fms]\n", ((double)(current_timestamp() - ts_mark)) / 1000);
 
 				/* Draw Objects */
 				char text[256];
@@ -287,27 +289,42 @@ bool FFmpegStreamChannel::decode(const char *input_stream_url)
 					detect_result_t *det_result = &(detect_result_group.results[i]);
 					sprintf(text, "%s %.1f%%", det_result->name, det_result->prop * 100);
 
-					printf("USE_RGA---->[%fms]%s @ (%d %d %d %d) %f\n", ((double)(current_timestamp() - ts_mark)) / 1000, det_result->name, det_result->box.left,
-					       det_result->box.top, det_result->box.right, det_result->box.bottom, det_result->prop);
+					printf("---->%s @ (%d %d %d %d) %f\n", det_result->name, det_result->box.left, det_result->box.top,
+					       det_result->box.right, det_result->box.bottom, det_result->prop);
 
 					int x1 = det_result->box.left;
 					int y1 = det_result->box.top;
 					int x2 = det_result->box.right;
 					int y2 = det_result->box.bottom;
-					rectangle(*mat4show, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255, 0, 0, 255), 3);
+					rectangle(*mat4show, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255, 0, 0, 255), 2);
 					putText(*mat4show, text, cv::Point(x1, y1 + 12), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
 				}
 
-				/* GUI渲染 */
-				// cv::imshow("RKNN2", *mat4show);
-				// cv::waitKey(1);
+				printf("DRAW BOX OK---->[%fms]\n", ((double)(current_timestamp() - ts_mark)) / 1000);
 
 				/* Free Outputs */
 				rknn_outputs_release(rknn_ctx, io_num.n_output, outputs);
+
+				/* OpenGL */
+				// if (image_texture != 0) {
+				// 	glDeleteTextures(1, &image_texture);
+				// 	image_texture = 0;
+				// }
+				// bind_cv_mat_to_gl_texture(*mat4show, image_texture);
+
+				/* Opencv */
+				cv::imshow(window_name, *mat4show);
+				cv::waitKey(1);
+
+				if (frame_input_tmp->pkt_pts > 0) {
+					cv::imwrite(std::to_string(frame_input_tmp->pkt_pts) + ".jpg", *mat4show);
+				}
+
+				printf("SHOW OK---->[%fms]\n", ((double)(current_timestamp() - ts_mark)) / 1000);
 			}
 		}
 
-		/* 音频帧处理 */
+		/* audio */
 		if (packet_input_tmp->stream_index == audio_stream_index_input) {
 			audio_frame_size += packet_input_tmp->size;
 			audio_frame_count++;

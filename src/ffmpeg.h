@@ -24,6 +24,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/imgproc/types_c.h>
+#include <opencv2/core/opengl.hpp>
 
 #include "rknn_api.h"
 #include "yolov5s_postprocess.h"
@@ -87,6 +88,10 @@ class FFmpegStreamChannel {
 	rknn_tensor_attr *output_attrs;
 	int init_rga_drm();
 	int init_rknn2();
+
+	/* opencv */
+	std::string window_name;
+	GLuint image_texture;
 	int init_window();
 	void bind_cv_mat_to_gl_texture(cv::Mat& image, GLuint& imageTexture);
 
