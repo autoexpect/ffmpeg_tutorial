@@ -285,9 +285,11 @@ bool FFmpegStreamChannel::decode(const char *input_stream_url)
 
 				/* Draw Objects */
 				char text[256];
+				char file_name[256];
 				for (int i = 0; i < detect_result_group.count; i++) {
 					detect_result_t *det_result = &(detect_result_group.results[i]);
 					sprintf(text, "%s %.1f%%", det_result->name, det_result->prop * 100);
+					sprintf(file_name, "%d_%s_%.1f", frame_input_tmp->pkt_pts, det_result->name, det_result->prop * 100);
 
 					printf("---->%s @ (%d %d %d %d) %f\n", det_result->name, det_result->box.left, det_result->box.top,
 					       det_result->box.right, det_result->box.bottom, det_result->prop);
@@ -296,10 +298,15 @@ bool FFmpegStreamChannel::decode(const char *input_stream_url)
 					int y1 = det_result->box.top;
 					int x2 = det_result->box.right;
 					int y2 = det_result->box.bottom;
-					rectangle(*mat4show, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255, 0, 0, 255), 2);
-					putText(*mat4show, text, cv::Point(x1, y1 + 12), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
-				}
 
+					if (frame_input_tmp->pkt_pts > 0 && std::string(det_result->name) == "person") {
+						cv::Rect rect_box(x1, y1, x2 - x1, y2 - y1);
+						cv::imwrite("/srv/helios64/1/" + std::string(file_name) + ".jpg", cv::Mat(*mat4show, rect_box));
+					}
+
+					// rectangle(*mat4show, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255, 0, 0, 255), 2);
+					// putText(*mat4show, text, cv::Point(x1, y1 + 12), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
+				}
 				printf("DRAW BOX OK---->[%fms]\n", ((double)(current_timestamp() - ts_mark)) / 1000);
 
 				/* Free Outputs */
@@ -313,12 +320,8 @@ bool FFmpegStreamChannel::decode(const char *input_stream_url)
 				// bind_cv_mat_to_gl_texture(*mat4show, image_texture);
 
 				/* Opencv */
-				cv::imshow(window_name, *mat4show);
-				cv::waitKey(1);
-
-				if (frame_input_tmp->pkt_pts > 0) {
-					cv::imwrite(std::to_string(frame_input_tmp->pkt_pts) + ".jpg", *mat4show);
-				}
+				// cv::imshow(window_name, *mat4show);
+				// cv::waitKey(1);
 
 				printf("SHOW OK---->[%fms]\n", ((double)(current_timestamp() - ts_mark)) / 1000);
 			}

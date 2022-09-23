@@ -30,7 +30,7 @@ list(APPEND SRC_LIST ${RK_SRCS})
 add_executable(ffmpeg_tutorial ${SRC_LIST})
 target_link_libraries(ffmpeg_tutorial rga drm rknn_api mali)
 # target_link_libraries(ffmpeg_tutorial SDL2)
-target_link_libraries(ffmpeg_tutorial opencv_imgcodecs opencv_features2d opencv_imgproc opencv_videoio opencv_highgui opencv_core)
+target_link_libraries(ffmpeg_tutorial opencv_features2d opencv_videoio opencv_highgui opencv_imgproc opencv_imgcodecs opencv_core)
 target_link_libraries(ffmpeg_tutorial avcodec swresample swscale avfilter avdevice avutil avformat)
 target_link_libraries(ffmpeg_tutorial -pthread stdc++ dl)
 

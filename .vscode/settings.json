@@ -61,7 +61,11 @@
         "concepts": "cpp",
         "ranges": "cpp",
         "stop_token": "cpp",
-        "typeindex": "cpp"
+        "typeindex": "cpp",
+        "set": "cpp",
+        "unordered_set": "cpp",
+        "iomanip": "cpp",
+        "shared_mutex": "cpp"
     },
     "cmake.sourceDirectory": "${workspaceFolder}/src"
 }
