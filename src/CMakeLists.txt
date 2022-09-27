@@ -10,6 +10,8 @@ add_definitions(-D_GLIBCXX_USE_C99=1)
 set(CMAKE_C_FLAGS "-Wno-attributes -Wno-write-strings -Wno-deprecated-declarations ${CMAKE_C_FLAGS} -s")
 set(CMAKE_CXX_FLAGS "-Wno-attributes -Wno-write-strings -Wno-deprecated-declarations ${CMAKE_CXX_FLAGS} -s")
 
+set(CMAKE_EXE_LINKER_FLAGS "-Wl,-rpath=./target/lib ${CMAKE_EXE_LINKER_FLAGS}")
+
 aux_source_directory(. SRC_LIST)
 
 # target
@@ -19,11 +21,8 @@ link_directories(${CMAKE_INSTALL_PREFIX}/lib)
 # opencv
 include_directories(${CMAKE_INSTALL_PREFIX}/include/opencv4)
 
-# ffmpeg_tutorial headers
-include_directories(${PROJECT_SOURCE_DIR}/rockchip)
-link_directories(${PROJECT_SOURCE_DIR}/rockchip)
-
 # rockchip
+include_directories(${PROJECT_SOURCE_DIR}/rockchip)
 aux_source_directory(./rockchip RK_SRCS)
 list(APPEND SRC_LIST ${RK_SRCS})
 

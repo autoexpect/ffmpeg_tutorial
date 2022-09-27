@@ -21,9 +21,9 @@ release:
 	-DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
 	${ROOT_DIR}/src && \
 	make -j$(nproc) && make install && cd -
-	cp ${ROOT_DIR}/src/rockchip/librknn_api.so ${INSTALL_DIR}/lib
-	cp ${ROOT_DIR}/src/rockchip/librknnrt.so ${INSTALL_DIR}/lib
-	patchelf --set-rpath './target/lib' target/bin/ffmpeg_tutorial
+	cp ${ROOT_DIR}/src/3rdparty/rknpu/RK3588/Linux/librknn_api/aarch64/*.so ${INSTALL_DIR}/lib
+	cp ${ROOT_DIR}/src/3rdparty/rga/RK3588/lib/Linux/aarch64/*.so ${INSTALL_DIR}/lib
+	patchelf --set-rpath "./target/lib/" ./target/bin/ffmpeg_tutorial
 
 opencv:
 	@[ ! -d ${BUILD_DIR}/opencv ] && git clone https://github.com/opencv/opencv.git --depth=1 ${BUILD_DIR}/opencv || echo "opencv source ready..."
